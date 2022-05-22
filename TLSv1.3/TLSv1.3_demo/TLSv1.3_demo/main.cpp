@@ -35,7 +35,7 @@ static std::once_flag globalInitOnce;
 int main(int argc, char *argv[])
 {
 	std::call_once(globalInitOnce, [] {
-		std::cout << "openssl version: " << OpenSSL_version(OPENSSL_VERSION);
+		DEBUG_EX_LOG( "openssl version: %s" ,  OpenSSL_version(OPENSSL_VERSION));
 		// Initialize some crypto stuff.
 		RAND_poll();
 	});
@@ -43,8 +43,8 @@ int main(int argc, char *argv[])
 	/////////////
 	// global ssl
 	////////////
-	chen::dtlsv1x::ReadCertificateAndPrivateKeyFromFiles();
-
+	//chen::dtlsv1x::ReadCertificateAndPrivateKeyFromFiles();
+	chen::dtlsv1x::GenerateCertificateAndPrivateKey();
 
 	// Create a global SSL_CTX.
 	chen::dtlsv1x::CreateSslCtx();
@@ -55,6 +55,23 @@ int main(int argc, char *argv[])
 	 
 
 
+	chen::dtlsv1x client("client");
+	chen::dtlsv1x server("server");
+	client.SetListener(&server);
+	server.SetListener(&client);
+
+	client.startup();
+	server.startup();
+	//server ×¼±¸handhasb
+	server.Run(chen::Role::SERVER);
+
+	client.Run(chen::Role::CLIENT);
+
+	while (true)
+	{
+		DEBUG_EX_LOG("main sleep 1 seconds ...");
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
 
 	return EXIT_SUCCESS;
 }

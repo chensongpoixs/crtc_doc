@@ -36,7 +36,7 @@ purpose:		log
 		if (num > 0)
 		{
 			 fprintf(out_file_log_ptr, "%s\n", message);
-			 printf(   "%s\n", message);
+			 fprintf(stdout,   "%s\n", message);
 			 fflush(out_file_log_ptr);
 			 //fflush(stdout);
 		}

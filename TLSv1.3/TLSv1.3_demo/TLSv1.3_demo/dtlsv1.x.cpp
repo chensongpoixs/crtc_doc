@@ -74,11 +74,155 @@ namespace chen {
 	thread_local std::vector<Fingerprint>  localFingerprints;
 
 
+
+	void dtlsv1x::GenerateCertificateAndPrivateKey()
+	{
+		 
+
+		int ret{ 0 };
+		EC_KEY* ecKey{ nullptr };
+		X509_NAME* certName{ nullptr };
+		std::string subject = std::string("chensong") + std::to_string(999999);
+
+		// Create key with curve.
+		ecKey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+
+		if (!ecKey)
+		{
+			ERROR_EX_LOG("EC_KEY_new_by_curve_name() failed");
+
+			goto error;
+		}
+
+		EC_KEY_set_asn1_flag(ecKey, OPENSSL_EC_NAMED_CURVE);
+
+		// NOTE: This can take some time.
+		ret = EC_KEY_generate_key(ecKey);
+
+		if (ret == 0)
+		{
+			ERROR_EX_LOG("EC_KEY_generate_key() failed");
+
+			goto error;
+		}
+
+		// Create a private key object.
+		privateKey = EVP_PKEY_new();
+
+		if (!privateKey)
+		{
+			ERROR_EX_LOG("EVP_PKEY_new() failed");
+
+			goto error;
+		}
+
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+		ret = EVP_PKEY_assign_EC_KEY( privateKey, ecKey);
+
+		if (ret == 0)
+		{
+			ERROR_EX_LOG("EVP_PKEY_assign_EC_KEY() failed");
+
+			goto error;
+		}
+
+		// The EC key now belongs to the private key, so don't clean it up separately.
+		ecKey = nullptr;
+
+		// Create the X509 certificate.
+		 certificate = X509_new();
+
+		if (!  certificate)
+		{
+			ERROR_EX_LOG("X509_new() failed");
+
+			goto error;
+		}
+
+		// Set version 3 (note that 0 means version 1).
+		X509_set_version(  certificate, 2);
+
+		// Set serial number (avoid default 0).
+		ASN1_INTEGER_set(
+			X509_get_serialNumber(  certificate),
+			static_cast<uint64_t>(9999999));
+
+		// Set valid period.
+		X509_gmtime_adj(X509_get_notBefore(  certificate), -315360000); // -10 years.
+		X509_gmtime_adj(X509_get_notAfter( certificate), 315360000);   // 10 years.
+
+		// Set the public key for the certificate using the key.
+		ret = X509_set_pubkey( certificate,  privateKey);
+
+		if (ret == 0)
+		{
+			ERROR_EX_LOG("X509_set_pubkey() failed");
+
+			goto error;
+		}
+
+		// Set certificate fields.
+		certName = X509_get_subject_name(  certificate);
+
+		if (!certName)
+		{
+			ERROR_EX_LOG("X509_get_subject_name() failed");
+
+			goto error;
+		}
+
+		X509_NAME_add_entry_by_txt(
+			certName, "O", MBSTRING_ASC, reinterpret_cast<const uint8_t*>(subject.c_str()), -1, -1, 0);
+		X509_NAME_add_entry_by_txt(
+			certName, "CN", MBSTRING_ASC, reinterpret_cast<const uint8_t*>(subject.c_str()), -1, -1, 0);
+
+		// It is self-signed so set the issuer name to be the same as the subject.
+		ret = X509_set_issuer_name(  certificate, certName);
+
+		if (ret == 0)
+		{
+			ERROR_EX_LOG("X509_set_issuer_name() failed");
+
+			goto error;
+		}
+
+		// Sign the certificate with its own private key.
+		ret = X509_sign( certificate,  privateKey, EVP_sha1());
+
+		if (ret == 0)
+		{
+			ERROR_EX_LOG("X509_sign() failed");
+
+			goto error;
+		}
+
+		return;
+
+	error:
+
+		if (ecKey)
+		{
+			EC_KEY_free(ecKey);
+		}
+
+		if (privateKey)
+		{
+			EVP_PKEY_free(privateKey); // NOTE: This also frees the EC key.
+		}
+
+		if (certificate)
+		{
+			X509_free(certificate);
+		}
+
+		ERROR_EX_LOG("DTLS certificate and private key generation failed");
+	}
+
 	// 读取公钥和私钥
 	void dtlsv1x::ReadCertificateAndPrivateKeyFromFiles()
 	{
 		FILE* file{ nullptr };
-
+		DEBUG_EX_LOG("");
 		file = fopen(dtlsCertificateFile, "r");
 
 		if (!file)
@@ -87,7 +231,7 @@ namespace chen {
 
 			return;
 		}
-
+		DEBUG_EX_LOG("");
 		certificate = PEM_read_X509(file, nullptr, nullptr, nullptr);
 
 		if (!certificate)
@@ -96,7 +240,7 @@ namespace chen {
 
 			return;
 		}
-
+		DEBUG_EX_LOG("");
 		fclose(file);
 
 		file = fopen(dtlsPrivateKeyFile, "r");
@@ -223,7 +367,7 @@ namespace chen {
 		// NOTE: https://bugs.ruby-lang.org/issues/12324
 
 		// For OpenSSL >= 1.0.2.
-		SSL_CTX_set_ecdh_auto(DtlsTransport::sslCtx, 1);
+		SSL_CTX_set_ecdh_auto( sslCtx, 1);
 
 		// Set the "use_srtp" DTLS extension.
 		for (auto it = srtpCryptoSuites.begin(); it != srtpCryptoSuites.end(); ++it)
@@ -351,7 +495,7 @@ namespace chen {
 
 		if (localRole == previousLocalRole)
 		{
-			ERROR_EX_LOG("same local DTLS role provided, doing nothing");
+			ERROR_EX_LOG("[server_name = %s]same local DTLS role provided, doing nothing", m_server_name.c_str());
 
 			return;
 		}
@@ -359,7 +503,7 @@ namespace chen {
 		// If the previous local DTLS role was 'client' or 'server' do reset.
 		if (previousLocalRole == Role::CLIENT || previousLocalRole == Role::SERVER)
 		{
-			DEBUG_EX_LOG("resetting DTLS due to local role change");
+			DEBUG_EX_LOG("[server_name = %s]resetting DTLS due to local role change", m_server_name.c_str());
 
 			Reset();
 		}
@@ -399,7 +543,7 @@ namespace chen {
 
 		default:
 		{
-			ERROR_EX_LOG("invalid local DTLS role");
+			ERROR_EX_LOG("[server_name = %s]invalid local DTLS role", m_server_name.c_str());
 		}
 
 		}
@@ -407,56 +551,15 @@ namespace chen {
 
 	void dtlsv1x::ProcessDtlsData(const uint8_t * data, size_t len)
 	{
-		int written;
-		int read;
-
-		if (!IsRunning())
+		DEBUG_EX_LOG("[server_name = %s] ", m_server_name.c_str());
+		dtsl_data temp_data;
+		temp_data.data = new uint8_t[len];
+		memcpy(temp_data.data, data, len);
+		temp_data.size = len;
 		{
-			ERROR_EX_LOG("cannot process data while not running");
+			std::lock_guard<std::mutex> locak(m_mutex);
 
-			return;
-		}
-
-		// Write the received DTLS data into the sslBioFromNetwork.
-		written =
-			BIO_write(this->sslBioFromNetwork, static_cast<const void*>(data), static_cast<int>(len));
-
-		if (written != static_cast<int>(len))
-		{
-			WARNING_EX_LOG( 
-				"OpenSSL BIO_write() wrote less (%zu bytes) than given data (%zu bytes)",
-				static_cast<size_t>(written),
-				len);
-		}
-
-		// Must call SSL_read() to process received DTLS data.
-		read = SSL_read(this->ssl, static_cast<void*>( sslReadBuffer), SslReadBufferSize);
-
-		// Send data if it's ready.
-		SendPendingOutgoingDtlsData();
-
-		// Check SSL status and return if it is bad/closed.
-		if (!CheckStatus(read))
-			return;
-
-		// Set/update the DTLS timeout.
-	/*	if (!SetTimeout())
-			return;*/
-
-		// Application data received. Notify to the listener.
-		if (read > 0)
-		{
-			// It is allowed to receive DTLS data even before validating remote fingerprint.
-			if (!this->handshakeDone)
-			{
-				WARNING_EX_LOG(  "ignoring application data received while DTLS handshake not done");
-
-				return;
-			}
-
-			// Notify the listener.
-			/*this->listener->OnDtlsTransportApplicationDataReceived(
-				this, (uint8_t*) sslReadBuffer, static_cast<size_t>(read));*/
+			m_quene.push_back(temp_data);
 		}
 	}
 
@@ -467,10 +570,11 @@ namespace chen {
 
 		if (!IsRunning())
 		{
+			DEBUG_EX_LOG("");
 			return;
 		}
 
-		WARNING_EX_LOG( "resetting DTLS transport");
+		WARNING_EX_LOG( "[server_name = %s]resetting DTLS transport", m_server_name.c_str());
 
 		// Stop the DTLS timer.
 		//this->timer->Stop();
@@ -510,39 +614,39 @@ namespace chen {
 			break;
 
 		case SSL_ERROR_SSL:
-			ERROR_EX_LOG("SSL status: SSL_ERROR_SSL");
+			ERROR_EX_LOG("[server_name = %s]SSL status: SSL_ERROR_SSL", m_server_name.c_str());
 			break;
 
 		case SSL_ERROR_WANT_READ:
 			break;
 
 		case SSL_ERROR_WANT_WRITE:
-			WARNING_EX_LOG(  "SSL status: SSL_ERROR_WANT_WRITE");
+			WARNING_EX_LOG(  "[server_name = %s]SSL status: SSL_ERROR_WANT_WRITE", m_server_name.c_str());
 			break;
 
 		case SSL_ERROR_WANT_X509_LOOKUP:
-			DEBUG_EX_LOG(  "SSL status: SSL_ERROR_WANT_X509_LOOKUP");
+			DEBUG_EX_LOG(  "[server_name = %s]SSL status: SSL_ERROR_WANT_X509_LOOKUP", m_server_name.c_str());
 			break;
 
 		case SSL_ERROR_SYSCALL:
-			ERROR_EX_LOG("SSL status: SSL_ERROR_SYSCALL");
+			ERROR_EX_LOG("[server_name = %s]SSL status: SSL_ERROR_SYSCALL", m_server_name.c_str());
 			break;
 
 		case SSL_ERROR_ZERO_RETURN:
 			break;
 
 		case SSL_ERROR_WANT_CONNECT:
-			WARNING_EX_LOG( "SSL status: SSL_ERROR_WANT_CONNECT");
+			WARNING_EX_LOG( "[server_name = %s]SSL status: SSL_ERROR_WANT_CONNECT", m_server_name.c_str());
 			break;
 
 		case SSL_ERROR_WANT_ACCEPT:
-			WARNING_EX_LOG( "SSL status: SSL_ERROR_WANT_ACCEPT");
+			WARNING_EX_LOG( "[server_name = %s]SSL status: SSL_ERROR_WANT_ACCEPT", m_server_name.c_str());
 			break;
 
 		default:
-			WARNING_EX_LOG(  "SSL status: unknown error");
+			WARNING_EX_LOG(  "[server_name = %s]SSL status: unknown error", m_server_name.c_str());
 		}
-
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 		// Check if the handshake (or re-handshake) has been done right now.
 		if (this->handshakeDoneNow)
 		{
@@ -551,10 +655,11 @@ namespace chen {
 
 			// Stop the timer.
 			//this->timer->Stop();
-
+			DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 			// Process the handshake just once (ignore if DTLS renegotiation).
 			if (!wasHandshakeDone && this->remoteFingerprint.algorithm != FingerprintAlgorithm::NONE)
 			{
+				DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 				return ProcessHandshake();
 			}
 
@@ -565,7 +670,7 @@ namespace chen {
 		{
 			if (this->state == DtlsState::CONNECTED)
 			{
-				DEBUG_EX_LOG(  "disconnected");
+				DEBUG_EX_LOG(  "[server_name = %s]disconnected", m_server_name.c_str());
 
 				Reset();
 
@@ -575,7 +680,7 @@ namespace chen {
 			}
 			else
 			{
-				WARNING_EX_LOG(  "connection failed");
+				WARNING_EX_LOG(  "[server_name = %s]connection failed", m_server_name.c_str());
 
 				Reset();
 
@@ -586,10 +691,10 @@ namespace chen {
 
 			return false;
 		}
-		//else
-		//{
-			return true;
-		//}
+
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		 return true;
+		 
 	}
 
 	bool dtlsv1x::ProcessHandshake()
@@ -605,7 +710,7 @@ namespace chen {
 
 			return false;
 		}
-
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 		// Get the negotiated SRTP crypto suite.
 		//RTC::SrtpSession::CryptoSuite srtpCryptoSuite = GetNegotiatedSrtpCryptoSuite();
 
@@ -619,7 +724,7 @@ namespace chen {
 
 		// NOTE: We assume that "use_srtp" DTLS extension is required even if
 		// there is no audio/video.
-		WARNING_EX_LOG(  "SRTP crypto suite not negotiated");
+		WARNING_EX_LOG(  "[server_name = %s]SRTP crypto suite not negotiated", m_server_name.c_str());
 
 		Reset();
 
@@ -636,50 +741,63 @@ namespace chen {
 		uint8_t binaryFingerprint[EVP_MAX_MD_SIZE];
 		unsigned int size{ 0 };
 		char hexFingerprint[(EVP_MAX_MD_SIZE * 3) + 1];
-		const EVP_MD* hashFunction;
+		const EVP_MD* hashFunction = NULL;
 		int ret;
-
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 		certificate = SSL_get_peer_certificate(this->ssl);
 
 		if (!certificate)
 		{
-			WARNING_EX_LOG(  "no certificate was provided by the peer");
+			WARNING_EX_LOG(  "[server_name = %s]no certificate was provided by the peer", m_server_name.c_str());
 
 			return false;
 		}
-
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 		switch (this->remoteFingerprint.algorithm)
 		{
-		case FingerprintAlgorithm::SHA1:
-			hashFunction = EVP_sha1();
-			break;
+			case FingerprintAlgorithm::SHA1:
+			{
+				hashFunction = EVP_sha1();
+				break;
 
-		case FingerprintAlgorithm::SHA224:
-			hashFunction = EVP_sha224();
-			break;
+			}
+			case FingerprintAlgorithm::SHA224:
+			{
+				hashFunction = EVP_sha224();
+				break;
+			}
 
-		case FingerprintAlgorithm::SHA256:
-			hashFunction = EVP_sha256();
-			break;
+			case FingerprintAlgorithm::SHA256:
+			{
+				hashFunction = EVP_sha256();
+				break;
+			}
 
-		case FingerprintAlgorithm::SHA384:
-			hashFunction = EVP_sha384();
-			break;
+			case FingerprintAlgorithm::SHA384:
+			{
+				hashFunction = EVP_sha384();
+				break;
+			}
 
-		case FingerprintAlgorithm::SHA512:
-			hashFunction = EVP_sha512();
-			break;
+			case FingerprintAlgorithm::SHA512:
+			{
+				hashFunction = EVP_sha512();
+				break;
+			}
 
-		default:
-			ERROR_EX_LOG("unknown algorithm");
+			default:
+			{
+				ERROR_EX_LOG("[server_name = %s]unknown algorithm", m_server_name.c_str());
+			}
 		}
 
 		// Compare the remote fingerprint with the value given via signaling.
 		ret = X509_digest(certificate, hashFunction, binaryFingerprint, &size);
-
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		//(void *)hashFunction;
 		if (ret == 0)
 		{
-			ERROR_EX_LOG("X509_digest() failed");
+			ERROR_EX_LOG("[server_name = %s]X509_digest() failed", m_server_name.c_str());
 
 			X509_free(certificate);
 
@@ -696,7 +814,7 @@ namespace chen {
 		if (this->remoteFingerprint.value != hexFingerprint)
 		{
 			WARNING_EX_LOG( 
-				"fingerprint in the remote certificate (%s) does not match the announced one (%s)",
+				"[server_name = %s]fingerprint in the remote certificate (%s) does not match the announced one (%s)", m_server_name.c_str(),
 				hexFingerprint,
 				this->remoteFingerprint.value.c_str());
 
@@ -705,7 +823,7 @@ namespace chen {
 			return false;
 		}
 
-		DEBUG_EX_LOG(  "valid remote fingerprint");
+		DEBUG_EX_LOG(  "[server_name = %s]valid remote fingerprint", m_server_name.c_str());
 
 		// Get the remote certificate in PEM format.
 
@@ -720,7 +838,7 @@ namespace chen {
 
 		if (ret != 1)
 		{
-			ERROR_EX_LOG("PEM_write_bio_X509() failed");
+			ERROR_EX_LOG("[server_name = %s]PEM_write_bio_X509() failed", m_server_name.c_str());
 
 			X509_free(certificate);
 			BIO_free(bio);
@@ -734,14 +852,14 @@ namespace chen {
 
 		if (!mem || !mem->data || mem->length == 0u)
 		{
-			ERROR_EX_LOG("BIO_get_mem_ptr() failed");
+			ERROR_EX_LOG("[server_name = %s]BIO_get_mem_ptr() failed", m_server_name.c_str());
 
 			X509_free(certificate);
 			BIO_free(bio);
 
 			return false;
 		}
-
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 		this->remoteCert = std::string(mem->data, mem->length);
 
 		X509_free(certificate);
@@ -750,7 +868,7 @@ namespace chen {
 		return true;
 	}
 
-		void dtlsv1x::show() const
+	void dtlsv1x::show() const
 	{
 		std::string state{ "new" };
 		std::string role{ "none " };
@@ -785,12 +903,22 @@ namespace chen {
 		default:;
 		}
 
-		DEBUG_EX_LOG("<dtlsv1x>");
+		DEBUG_EX_LOG("[server_name = %s]<dtlsv1x>", m_server_name.c_str());
 		DEBUG_EX_LOG("  state           : %s", state.c_str());
 		DEBUG_EX_LOG("  role            : %s", role.c_str());
 		DEBUG_EX_LOG("  handshake done: : %s", this->handshakeDone ? "yes" : "no");
 		DEBUG_EX_LOG("</dtlsv1x>");
 	}
+
+		void dtlsv1x::SetListener(Listener * ptr)
+		{
+			this->listener = ptr;
+		}
+
+		void dtlsv1x::startup()
+		{
+			m_thread = std::thread(&dtlsv1x::_work_thread, this);
+		}
 
 		void dtlsv1x::OnSslInfo(int where, int ret)
 		{
@@ -806,7 +934,7 @@ namespace chen {
 
 			if ((where & SSL_CB_LOOP) != 0)
 			{
-				DEBUG_EX_LOG(  "[role:%s, action:'%s']", role, SSL_state_string_long(this->ssl));
+				DEBUG_EX_LOG(  "[server_name = %s][role:%s, action:'%s']", m_server_name.c_str(), role, SSL_state_string_long(this->ssl));
 			}
 			else if ((where & SSL_CB_ALERT) != 0)
 			{
@@ -828,35 +956,35 @@ namespace chen {
 
 				if ((where & SSL_CB_READ) != 0)
 				{
-					WARNING_EX_LOG( "received DTLS %s alert: %s", alertType, SSL_alert_desc_string_long(ret));
+					WARNING_EX_LOG( "[server_name = %s]received DTLS %s alert: %s", m_server_name.c_str(), alertType, SSL_alert_desc_string_long(ret));
 				}
 				else if ((where & SSL_CB_WRITE) != 0)
 				{
-					DEBUG_EX_LOG(  "sending DTLS %s alert: %s", alertType, SSL_alert_desc_string_long(ret));
+					DEBUG_EX_LOG(  "[server_name = %s]sending DTLS %s alert: %s", m_server_name.c_str(), alertType, SSL_alert_desc_string_long(ret));
 				}
 				else
 				{
-					DEBUG_EX_LOG(  "DTLS %s alert: %s", alertType, SSL_alert_desc_string_long(ret));
+					DEBUG_EX_LOG(  "[server_name = %s]DTLS %s alert: %s", m_server_name.c_str(), alertType, SSL_alert_desc_string_long(ret));
 				}
 			}
 			else if ((where & SSL_CB_EXIT) != 0)
 			{
 				if (ret == 0)
 				{
-					DEBUG_EX_LOG("[role:%s, failed:'%s']", role, SSL_state_string_long(this->ssl));
+					DEBUG_EX_LOG("[server_name = %s][role:%s, failed:'%s']", m_server_name.c_str(), role, SSL_state_string_long(this->ssl));
 				}
 				else if (ret < 0)
 				{
-					DEBUG_EX_LOG("role: %s, waiting:'%s']", role, SSL_state_string_long(this->ssl));
+					DEBUG_EX_LOG("[server_name = %s]role: %s, waiting:'%s']", m_server_name.c_str(), role, SSL_state_string_long(this->ssl));
 				}
 			}
 			else if ((where & SSL_CB_HANDSHAKE_START) != 0)
 			{
-				DEBUG_EX_LOG(  "DTLS handshake start");
+				DEBUG_EX_LOG(  "[server_name = %s]DTLS handshake start", m_server_name.c_str());
 			}
 			else if ((where & SSL_CB_HANDSHAKE_DONE) != 0)
 			{
-				DEBUG_EX_LOG( "DTLS handshake done");
+				DEBUG_EX_LOG( "[server_name = %s]DTLS handshake done", m_server_name.c_str());
 
 				this->handshakeDoneNow = true;
 			}
@@ -881,17 +1009,18 @@ namespace chen {
 		return 2 * timerUs;
 	}
 
-	dtlsv1x::dtlsv1x(Listener *listener)
-		:listener(listener)
+	dtlsv1x::dtlsv1x(const char * server_name/*Listener *listener*/)
+		: listener(NULL)
 		, ssl(NULL)
 		, sslBioFromNetwork(NULL)
 		, sslBioToNetwork(NULL)
 		, state(DtlsState::NEW)
-		, localRole( Role::NONE )
+		, localRole(Role::NONE)
 		, remoteFingerprint()
-	    , handshakeDone(false )
-	, handshakeDoneNow( false )
-	,remoteCert()
+		, handshakeDone(false)
+		, handshakeDoneNow(false)
+		, remoteCert()
+		, m_server_name(server_name)
 	{
 		/* Set SSL. */
 
@@ -899,7 +1028,7 @@ namespace chen {
 
 		if (!this->ssl)
 		{
-			ERROR_EX_LOG("SSL_new() failed");
+			ERROR_EX_LOG("[server_name = %s]SSL_new() failed", m_server_name.c_str());
 
 			goto error;
 		}
@@ -911,7 +1040,7 @@ namespace chen {
 
 		if (!this->sslBioFromNetwork)
 		{
-			ERROR_EX_LOG("BIO_new() failed");
+			ERROR_EX_LOG("[server_name = %s]BIO_new() failed", m_server_name.c_str());
 
 			SSL_free(this->ssl);
 
@@ -922,7 +1051,7 @@ namespace chen {
 
 		if (!this->sslBioToNetwork)
 		{
-			ERROR_EX_LOG("BIO_new() failed");
+			ERROR_EX_LOG("[server_name = %s]BIO_new() failed", m_server_name.c_str());
 
 			BIO_free(this->sslBioFromNetwork);
 			SSL_free(this->ssl);
@@ -965,7 +1094,7 @@ namespace chen {
 
 		// NOTE: If this is not catched by the caller the program will abort, but
 		// this should never happen.
-		ERROR_EX_LOG("DtlsTransport instance creation failed");
+		ERROR_EX_LOG("[server_name = %s]DtlsTransport instance creation failed", m_server_name.c_str());
 	}
 	bool dtlsv1x::IsRunning() const
 	{
@@ -989,6 +1118,7 @@ namespace chen {
 	{
 		if (BIO_eof(this->sslBioToNetwork))
 		{
+			DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 			return;
 		}
 
@@ -998,9 +1128,12 @@ namespace chen {
 		read = BIO_get_mem_data(this->sslBioToNetwork, &data); // NOLINT
 
 		if (read <= 0)
+		{
+			WARNING_EX_LOG("[server_name = %s]", m_server_name.c_str());
 			return;
+		}
 
-		DEBUG_EX_LOG("%u bytes of DTLS data ready to sent to the peer", read);
+		DEBUG_EX_LOG("[server_name = %s]%u bytes of DTLS data ready to sent to the peer", m_server_name.c_str(), read);
 
 		// Notify the listener.
 		this->listener->ProcessDtlsData(  reinterpret_cast<uint8_t*>(data), static_cast<size_t>(read));
@@ -1008,6 +1141,93 @@ namespace chen {
 		// Clear the BIO buffer.
 		// NOTE: the (void) avoids the -Wunused-value warning.
 		(void)BIO_reset(this->sslBioToNetwork);
+	}
+
+	void dtlsv1x::_work_thread()
+	{
+		while (true)
+		{
+			if (m_quene.empty())
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			}
+			else
+			{
+				while (!m_quene.empty())
+				{
+					DEBUG_EX_LOG("quene size = %u", m_quene.size());
+					dtsl_data temp_data;
+					{
+						std::lock_guard<std::mutex> locak(m_mutex);
+						temp_data = m_quene.front();
+						m_quene.pop_front();
+					}
+					std::this_thread::sleep_for(std::chrono::seconds(1));
+					_process_data(temp_data.data, temp_data.size);
+					delete[] temp_data.data;
+					temp_data.data = NULL;
+					temp_data.size = 0;
+				}
+			}
+		}
+	}
+
+	void dtlsv1x::_process_data(const uint8_t * data, size_t len)
+	{
+		int written;
+		int read;
+
+		if (!IsRunning())
+		{
+			ERROR_EX_LOG("[server_name = %s]cannot process data while not running", m_server_name.c_str());
+
+			return;
+		}
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		// Write the received DTLS data into the sslBioFromNetwork.
+		written =
+			BIO_write(this->sslBioFromNetwork, static_cast<const void*>(data ), static_cast<int>(len));
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		if (written != static_cast<int>(len))
+		{
+			WARNING_EX_LOG(
+				"[server_name = %s]OpenSSL BIO_write() wrote less (%zu bytes) than given data (%zu bytes)", m_server_name.c_str(),
+				static_cast<size_t>(written),
+				len);
+		}
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		// Must call SSL_read() to process received DTLS data.
+		read = SSL_read(this->ssl, static_cast<void*>(sslReadBuffer), SslReadBufferSize);
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		// Send data if it's ready.
+		SendPendingOutgoingDtlsData();
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		// Check SSL status and return if it is bad/closed.
+		if (!CheckStatus(read))
+		{
+			return;
+		}
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+		// Set/update the DTLS timeout.
+	/*	if (!SetTimeout())
+			return;*/
+
+			// Application data received. Notify to the listener.
+		if (read > 0)
+		{
+			// It is allowed to receive DTLS data even before validating remote fingerprint.
+			if (!this->handshakeDone)
+			{
+				WARNING_EX_LOG("[server_name = %s]ignoring application data received while DTLS handshake not done", m_server_name.c_str());
+
+				return;
+			}
+			DEBUG_EX_LOG("[server_name = %s]SctpAssociation", m_server_name.c_str());
+			// Notify the listener.
+			/*this->listener->OnDtlsTransportApplicationDataReceived(
+				this, (uint8_t*) sslReadBuffer, static_cast<size_t>(read));*/
+		}
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 	}
 
 

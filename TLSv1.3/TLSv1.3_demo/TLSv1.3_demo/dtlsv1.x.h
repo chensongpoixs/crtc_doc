@@ -28,7 +28,7 @@ purpose:		TLSv1.3 协议的学习
 #include <map>
 #include <string>
 #include "clog.h"
-
+#include <list>
 
 
 namespace chen {
@@ -82,11 +82,11 @@ namespace chen {
 	class dtlsv1x : public Listener
 	{
 	public:
-		dtlsv1x(Listener * listener);
+		dtlsv1x(const char * server_name/*Listener * listener*/);
 
 		//~dtlsv1x();
 	public:
-
+		static void GenerateCertificateAndPrivateKey();
 		static void ReadCertificateAndPrivateKeyFromFiles();
 
 
@@ -113,7 +113,13 @@ namespace chen {
 	public:
 		void show() const;
 
+
+
+		void SetListener(Listener* ptr);
 		/* Callbacks fired by OpenSSL events. */
+
+
+		void startup();
 	public:
 		void OnSslInfo(int where, int ret);
 
@@ -123,7 +129,19 @@ namespace chen {
 		
 
 		void SendPendingOutgoingDtlsData();
+
+
+		void _work_thread();
+		void _process_data(const uint8_t * data, size_t len);
 	private:
+		struct dtsl_data
+		{
+			uint8_t * data;
+			size_t   size;
+			dtsl_data()
+				: data(NULL)
+				, size(0){}
+		};
 		Listener * listener;
 		SSL* ssl{ nullptr };
 
@@ -137,6 +155,11 @@ namespace chen {
 		bool handshakeDone{ false };
 		bool handshakeDoneNow{ false };
 		std::string remoteCert;
+		std::string m_server_name;
+		std::thread m_thread;
+		std::mutex		m_mutex;
+		
+		std::list<dtsl_data> m_quene;
 	};
 }
 
