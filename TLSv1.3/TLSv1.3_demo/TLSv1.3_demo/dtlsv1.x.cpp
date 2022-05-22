@@ -84,7 +84,7 @@ namespace chen {
 		X509_NAME* certName{ nullptr };
 		std::string subject = std::string("chensong") + std::to_string(999999);
 
-		// Create key with curve.
+		// 1. 使用曲线创建关键点。
 		ecKey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
 
 		if (!ecKey)
@@ -106,7 +106,7 @@ namespace chen {
 			goto error;
 		}
 
-		// Create a private key object.
+		// 2. 创建私钥对象。
 		privateKey = EVP_PKEY_new();
 
 		if (!privateKey)
@@ -129,7 +129,7 @@ namespace chen {
 		// The EC key now belongs to the private key, so don't clean it up separately.
 		ecKey = nullptr;
 
-		// Create the X509 certificate.
+		// 3. 创建 X509 证书.
 		 certificate = X509_new();
 
 		if (!  certificate)
@@ -139,7 +139,7 @@ namespace chen {
 			goto error;
 		}
 
-		// Set version 3 (note that 0 means version 1).
+		// Set version 3 (note that 0 means version 1). 
 		X509_set_version(  certificate, 2);
 
 		// Set serial number (avoid default 0).
@@ -267,7 +267,7 @@ namespace chen {
 	//DTLS状态回调
 	inline static void onSslInfo(const SSL* ssl, int where, int ret)
 	{
-		DEBUG_EX_LOG("[where = %d][ret = %d]", where, ret);
+		//DEBUG_EX_LOG("[where = %d][ret = %d]", where, ret);
 		static_cast<dtlsv1x*>(SSL_get_ex_data(ssl, 0))->OnSslInfo(where, ret);
 	}
 
@@ -276,7 +276,7 @@ namespace chen {
 	inline static int onSslCertificateVerify(int /*preverifyOk*/, X509_STORE_CTX* /*ctx*/)
 	{
 
-		DEBUG_EX_LOG("OpenSSL callbacks");
+		//DEBUG_EX_LOG("OpenSSL callbacks");
 		// Always valid since DTLS certificates are self-signed.
 		return 1;
 	}
@@ -416,10 +416,9 @@ namespace chen {
 		{
 			return it->second;
 		}
-		//else
-		//{
+		 
 		return  FingerprintAlgorithm::NONE;
-		//}
+		 
 	}
 	void dtlsv1x::GenerateFingerprints()
 	{
@@ -437,28 +436,40 @@ namespace chen {
 
 			switch (algorithm)
 			{
-			case FingerprintAlgorithm::SHA1:
-				hashFunction = EVP_sha1();
-				break;
+				case FingerprintAlgorithm::SHA1:
+				{
+					hashFunction = EVP_sha1();
+					break;
+				}
 
-			case FingerprintAlgorithm::SHA224:
-				hashFunction = EVP_sha224();
-				break;
+				case FingerprintAlgorithm::SHA224:
+				{
+					hashFunction = EVP_sha224();
+					break;
+				}
 
-			case FingerprintAlgorithm::SHA256:
-				hashFunction = EVP_sha256();
-				break;
+				case FingerprintAlgorithm::SHA256:
+				{
+					hashFunction = EVP_sha256();
+					break;
+				}
 
-			case FingerprintAlgorithm::SHA384:
-				hashFunction = EVP_sha384();
-				break;
+				case FingerprintAlgorithm::SHA384:
+				{
+					hashFunction = EVP_sha384();
+					break;
+				}
 
-			case FingerprintAlgorithm::SHA512:
-				hashFunction = EVP_sha512();
-				break;
+				case FingerprintAlgorithm::SHA512:
+				{
+					hashFunction = EVP_sha512();
+					break;
+				}
 
-			default:
-				ERROR_EX_LOG("unknown algorithm");
+				default:
+				{
+					ERROR_EX_LOG("unknown algorithm");
+				}
 			}
 
 			ret = X509_digest(certificate, hashFunction, binaryFingerprint, &size);
@@ -513,38 +524,38 @@ namespace chen {
 
 		// Set state and notify the listener.
 		this->state = DtlsState::CONNECTING;
-		//this->listener->OnDtlsTransportConnecting(this);
+		 
 
 		switch (this->localRole)
 		{
-		case Role::CLIENT:
-		{
-			DEBUG_EX_LOG("running [role:client]");
+			case Role::CLIENT:
+			{
+				DEBUG_EX_LOG("running [role:client]");
 
-			///  ????????????????????????????? dtls ???? 交换协商的流程
+				///  ????????????????????????????? dtls ???? 交换协商的流程
 
-			SSL_set_connect_state(this->ssl);
-			SSL_do_handshake(this->ssl);
-			SendPendingOutgoingDtlsData();
+				SSL_set_connect_state(this->ssl);
+				SSL_do_handshake(this->ssl);
+				SendPendingOutgoingDtlsData();
 
 
-			break;
-		}
+				break;
+			}
 
-		case Role::SERVER:
-		{
-			DEBUG_EX_LOG("running [role:server]");
+			case Role::SERVER:
+			{
+				DEBUG_EX_LOG("running [role:server]");
 
-			SSL_set_accept_state(this->ssl);
-			SSL_do_handshake(this->ssl);
+				SSL_set_accept_state(this->ssl);
+				SSL_do_handshake(this->ssl);
 
-			break;
-		}
+				break;
+			}
 
-		default:
-		{
-			ERROR_EX_LOG("[server_name = %s]invalid local DTLS role", m_server_name.c_str());
-		}
+			default:
+			{
+				ERROR_EX_LOG("[server_name = %s]invalid local DTLS role", m_server_name.c_str());
+			}
 
 		}
 	}
@@ -655,7 +666,7 @@ namespace chen {
 
 			// Stop the timer.
 			//this->timer->Stop();
-			DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
+			DEBUG_EX_LOG("[server_name = %s][wasHandshakeDone = %u][remoteFingerprint.algorithm = %u]", m_server_name.c_str(), wasHandshakeDone, remoteFingerprint.algorithm);
 			// Process the handshake just once (ignore if DTLS renegotiation).
 			if (!wasHandshakeDone && this->remoteFingerprint.algorithm != FingerprintAlgorithm::NONE)
 			{
@@ -675,18 +686,16 @@ namespace chen {
 				Reset();
 
 				// Set state and notify the listener.
-				this->state = DtlsState::CLOSED;
-				//this->listener->OnDtlsTransportClosed(this);
+				this->state = DtlsState::CLOSED; 
 			}
 			else
 			{
 				WARNING_EX_LOG(  "[server_name = %s]connection failed", m_server_name.c_str());
 
 				Reset();
-
-				// Set state and notify the listener.
+ 
 				this->state = DtlsState::FAILED;
-				//this->listener->OnDtlsTransportFailed(this);
+				 
 			}
 
 			return false;
@@ -699,6 +708,7 @@ namespace chen {
 
 	bool dtlsv1x::ProcessHandshake()
 	{
+		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
 		// Validate the remote fingerprint.
 		if (!CheckRemoteFingerprint())
 		{
@@ -706,33 +716,15 @@ namespace chen {
 
 			// Set state and notify the listener.
 			this->state = DtlsState::FAILED;
-			//this->listener->OnDtlsTransportFailed(this);
+			 
 
 			return false;
 		}
 		DEBUG_EX_LOG("[server_name = %s]", m_server_name.c_str());
-		// Get the negotiated SRTP crypto suite.
-		//RTC::SrtpSession::CryptoSuite srtpCryptoSuite = GetNegotiatedSrtpCryptoSuite();
-
-		//if (srtpCryptoSuite != RTC::SrtpSession::CryptoSuite::NONE)
-		{
-			// Extract the SRTP keys (will notify the listener with them).
-			//ExtractSrtpKeys(srtpCryptoSuite);
-
-			return true;
-		}
-
-		// NOTE: We assume that "use_srtp" DTLS extension is required even if
-		// there is no audio/video.
-		WARNING_EX_LOG(  "[server_name = %s]SRTP crypto suite not negotiated", m_server_name.c_str());
-
-		Reset();
-
-		// Set state and notify the listener.
-		this->state = DtlsState::FAILED;
-		//this->listener->OnDtlsTransportFailed(this);
-
-		return false;
+		 
+		return true;
+	 
+		 
 	}
 
 	bool dtlsv1x::CheckRemoteFingerprint()
@@ -1100,14 +1092,20 @@ namespace chen {
 	{
 		switch (this->state)
 		{
-		case DtlsState::NEW:
-			return false;
-		case DtlsState::CONNECTING:
-		case DtlsState::CONNECTED:
-			return true;
-		case DtlsState::FAILED:
-		case DtlsState::CLOSED:
-			return false;
+			case DtlsState::NEW:
+			{
+				return false;
+			}
+			case DtlsState::CONNECTING:
+			case DtlsState::CONNECTED:
+			{
+				return true;
+			}
+			case DtlsState::FAILED:
+			case DtlsState::CLOSED:
+			{
+				return false;
+			}
 		}
 
 		// Make GCC 4.9 happy.

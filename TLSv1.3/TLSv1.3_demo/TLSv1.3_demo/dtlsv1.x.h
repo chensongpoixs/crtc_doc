@@ -86,6 +86,9 @@ namespace chen {
 
 		//~dtlsv1x();
 	public:
+		/**
+		*生成公私秘钥
+		*/
 		static void GenerateCertificateAndPrivateKey();
 		static void ReadCertificateAndPrivateKeyFromFiles();
 

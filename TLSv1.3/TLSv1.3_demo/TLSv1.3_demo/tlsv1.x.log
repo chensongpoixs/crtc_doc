@@ -1,0 +1,51 @@
+[main::<lambda_753ca7e35ae2132925550670624bc473>::operator ()][38][debug]openssl version: OpenSSL 1.1.0k  28 May 2019
+setting SRTP cryptoSuites for DTLS: SRTP_AEAD_AES_256_GCM:SRTP_AEAD_AES_128_GCM:SRTP_AES128_CM_SHA1_80:SRTP_AES128_CM_SHA1_32
+sha-1   fingerprint: 6C:BA:02:F2:3F:9C:1E:AE:55:D8:15:F9:1A:FB:6A:55:51:6D:89:AE
+sha-224 fingerprint: 3C:62:73:17:8D:59:B2:DD:2F:13:AC:FE:A0:39:AA:04:2E:2C:1C:2C:F8:B6:3C:0C:D9:ED:B0:65
+sha-256 fingerprint: F6:2F:E6:03:CF:25:7A:66:EE:34:54:AE:72:B2:C5:17:EC:F6:99:81:ED:D3:EB:BD:F4:85:BD:7D:A8:58:87:D4
+sha-384 fingerprint: 45:E8:66:2A:A7:E4:13:71:87:3B:9F:1D:8A:A6:71:60:71:D6:E9:17:1A:A8:4A:FC:89:06:F2:83:EA:8B:9E:CC:09:B3:D4:C0:1A:9F:4F:E1:44:69:65:73:8D:89:3A:BB
+sha-512 fingerprint: A4:CE:C8:2A:D9:EA:25:20:8E:BA:2B:00:B4:C8:E6:81:3A:87:70:6B:50:39:C7:48:E0:B6:73:42:47:A8:9C:CE:FB:9F:5C:70:E1:1B:CF:C9:3A:A1:83:0E:22:90:13:1E:1A:F1:B9:7B:08:AC:49:95:8B:16:71:C9:05:52:AE:6B
+running [role:server]
+DTLS handshake start
+[role:server, action:'before SSL initialization']
+role: server, waiting:'before SSL initialization']
+running [role:client]
+DTLS handshake start
+[role:client, action:'before SSL initialization']
+[role:client, action:'SSLv3/TLS write client hello']
+role: client, waiting:'SSLv3/TLS write client hello']
+[role:server, action:'before SSL initialization']
+[role:server, action:'SSLv3/TLS read client hello']
+[role:server, action:'SSLv3/TLS write server hello']
+[role:server, action:'SSLv3/TLS write certificate']
+[role:server, action:'SSLv3/TLS write key exchange']
+[role:server, action:'SSLv3/TLS write certificate request']
+[role:server, action:'SSLv3/TLS write server done']
+role: server, waiting:'SSLv3/TLS write server done']
+[role:client, action:'SSLv3/TLS write client hello']
+[role:client, action:'SSLv3/TLS read server hello']
+[role:client, action:'SSLv3/TLS read server certificate']
+[role:client, action:'SSLv3/TLS read server key exchange']
+[role:client, action:'SSLv3/TLS read server certificate request']
+[role:client, action:'SSLv3/TLS read server done']
+[role:client, action:'SSLv3/TLS write client certificate'] --> 发送客户端证书
+[role:client, action:'SSLv3/TLS write client key exchange'] ---> 客户端key改变 ？？？
+[role:client, action:'SSLv3/TLS write certificate verify']  ---> 客户端证书验证   
+[role:client, action:'SSLv3/TLS write change cipher spec']  --> 客户端 验证密码规制
+[role:client, action:'SSLv3/TLS write finished']
+role: client, waiting:'SSLv3/TLS write finished']
+role: server, waiting:'SSLv3/TLS write server done']
+role: client, waiting:'SSLv3/TLS write finished']
+[role:server, action:'SSLv3/TLS write server done']
+[role:server, action:'SSLv3/TLS read client certificate']  --> 服务器验证客户端证书
+[role:server, action:'SSLv3/TLS read client key exchange'] --> 服务器key改变？？？
+[role:server, action:'SSLv3/TLS read certificate verify']  --> 服务器读取客户端的证书验证
+[role:server, action:'SSLv3/TLS read change cipher spec']  --> 服务器读取客户端验证客户端证书密码规制
+[role:server, action:'SSLv3/TLS read finished']
+[role:server, action:'SSLv3/TLS write change cipher spec']  ---> 发送验证规制 
+[role:server, action:'SSLv3/TLS write finished']
+DTLS handshake done --> server
+[role:client, action:'SSLv3/TLS write finished']
+[role:client, action:'SSLv3/TLS read change cipher spec']
+[role:client, action:'SSLv3/TLS read finished']
+DTLS handshake done  --> client 
