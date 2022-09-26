@@ -30,6 +30,8 @@ s=-
 //Session name：会话名称，没有用“-”替代
 t=0 0
 //t（timing）=
+// start: 0
+// stop : 0
 webrtc始终是0,0代表没有限制
 a=group:BUNDLE 0 1
 // 表示需要共用一个传输通道传输的媒体，通过ssrc进行区分不同的流。如果没有这一行，音视频数据就会分别用单独udp端口来发送。也可表示为a=group:BUNDLE audio video。
@@ -125,7 +127,7 @@ a=rtpmap:96 VP8/90000
 a=rtcp-fb:96 goog-remb
 // 对rtpmap 96的描述,google标准的接收端带宽评估
 a=rtcp-fb:96 transport-cc
-// 对rtpmap 96的描述,传输端的带宽评估
+// 对 rtpmap 96的描述,传输端的带宽评估
 a=rtcp-fb:96 ccm fir
 对rtpmap 96的描述,支持客户端请求i帧
 ccm：codec control using RTCP feedback message
@@ -245,8 +247,11 @@ a=rtpmap:37 flexfec-03/90000
 a=rtcp-fb:37 goog-remb
 a=rtcp-fb:37 transport-cc
 a=fmtp:37 repair-window=10000000
+```
 
-4、answer SDP
+# 4、answer SDP
+
+```
 v=0
 o=SRS/4.0.122(Leo) 17222016 2 IN IP4 0.0.0.0
 s=SRSPlaySession
