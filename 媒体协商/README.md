@@ -1,4 +1,26 @@
-﻿# 一、WebRTC中信号状态枚举
+
+ 
+# 一、WebRTC媒体协商
+
+
+## 1、SDP协议
+
+
+<font color='red'>SDP中WebRTC做了哪些修改</font>
+
+
+## 2、Offer的创建
+
+
+## 3、Answer的创建
+
+
+## 4、SetLocalDescription做了哪些事儿？
+
+
+## 5、SetRemoteDescription又做了啥？
+ 
+# 二、WebRTC中信号状态枚举
 
 ｀｀｀
 enum RTCSignalingState {
