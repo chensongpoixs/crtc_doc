@@ -10,7 +10,28 @@
 <font color='red'>SDP中WebRTC做了哪些修改</font>
 
 
+## 2、编解码器信息收集的步骤
+
+composite：混合成的
+
+### ①、 创建PeerConnectionFactory
+
+### ②、 创建并初始化PeerConnection
+
+### ③、 信息存放于MediaSessionDescriptionFacfory中(重点)
+
+### ④、 最后创建SessionDescrioption
+
+
 ## 2、Offer的创建
+
+### ①、生成证书
+
+1. 生成Offer(SessionDescrtionption)之前要先有证书
+2. 证书是在pc->Initialize()中创建
+3. 当收到证书Ready信号(slot)时, 生成Offer
+4. Operationchain队列顺序化队列中队列大小为0时原理 size == 1机制 , Run();
+
 
 
 ## 3、Answer的创建
