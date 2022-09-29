@@ -124,17 +124,17 @@ a=rtcp-rsize
 // 尽可能的减少rtcp包的发送，只发丢包
 a=rtpmap:96 VP8/90000
 //payload type的描述,编码器VP8,时钟采样率90000
-a=rtcp-fb:96 goog-remb
+a=rtcp-fb:96 goog-remb //(支持使用rtcp包来控制发送方的码流,goog-remb为google的拥塞控制处理算法)
 // 对rtpmap 96的描述,google标准的接收端带宽评估
 a=rtcp-fb:96 transport-cc
 // 对 rtpmap 96的描述,传输端的带宽评估
-a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 ccm fir //(支持使用rtcp反馈机制来实现编码控制);
 对rtpmap 96的描述,支持客户端请求i帧
-ccm：codec control using RTCP feedback message
-fir：Full Intra Request
+//ccm：codec control using RTCP feedback message
+//fir：Full Intra Request
 a=rtcp-fb:96 nack
 // 支持丢包重传
-a=rtcp-fb:96 nack pli
+a=rtcp-fb:96 nack pli //(关键帧重传,当连续出现解码失败，或者长期没有解码输入，就通过RTCP报文发送请求IDR帧命令);
 // 支持i帧重传
 a=rtpmap:97 rtx/90000
 // rtx丢包重传

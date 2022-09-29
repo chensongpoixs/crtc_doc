@@ -20,6 +20,49 @@ composite：混合成的
 
 ### ③、 信息存放于MediaSessionDescriptionFacfory中(重点)
 
+
+WebRtcSessionDescriptionFactory 中certificate_request_state_ 生成certificate 四种状态
+
+```
+enum CertificateRequestState {
+    CERTIFICATE_NOT_NEEDED,
+    CERTIFICATE_WAITING,
+    CERTIFICATE_SUCCEEDED,
+    CERTIFICATE_FAILED,
+  };
+```
+
+证书的收集流程步骤
+
+在WebRtcSessionDescriptionFactory构造函数中 修改certificate_request_state_的状态 为CERTIFICATE_WAITING ， 后创建一个与RTCCertificateGenerationTask任务处理(证书生成使用的工作线程， 通知使用的信号线程通知的)WebRtcCertificateGeneratorCallback
+
+在RTCCertificateGenerationTask任务有任务使用工作线程创建证书， 生成后使用信号线程通知WebRtcCertificateGeneratorCallback中OnSuccess方法 中在回调WebRtcSessionDescriptionFactory中的方法 SetCertificate中修改 certificate_request_state_ 的状态为CERTIFICATE_SUCCEEDED 通知应用层、保持证书的数据
+
+然后检查应用层是否有创建Offer或者Answer的情况、 如果有的话说明create_session_description_requests_队列中是有数据的、<font color='red'> 一般情况下是没有数据的， 原因是只有的在应用层在生成证书之前调用创建Offer或者创建Answer的接口，create_session_description_requests_队列中才有数据，  </font>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### ④、 最后创建SessionDescrioption
 
 
