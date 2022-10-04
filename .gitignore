@@ -83,3 +83,7 @@ WebRTC服务质量(Qos)/~$5、NACK格式.pptx
 TLSv1.3/TLSv1.3_demo/.vs/TLSv1.3_demo/v15/Browse.VC.db
 TLSv1.3/TLSv1.3_demo/.vs/TLSv1.3_demo/v15/Browse.VC.opendb
 TLSv1.3/TLSv1.3_demo/.vs/TLSv1.3_demo/v15/ipch/AutoPCH/650bdc6d8cc323f1/CLOG.ipch
+媒体协商/RtpSender.oob
+媒体协商/WebRTC_AddTrack.oob
+媒体协商/webrtc_certificate.oob
+媒体协商/WebRTC_certificates.oob
