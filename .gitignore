@@ -94,3 +94,6 @@ TLSv1.3/TLSv1.3_demo/.vs/TLSv1.3_demo/v15/ipch/AutoPCH/650bdc6d8cc323f1/CLOG.ipc
 媒体协商/PeerConnectionFactory.oob
 媒体协商/RtpTransceiver.oob
 媒体协商/JsepSessionDescription.oob
+媒体协商/CreateOffer.oob
+媒体协商/peerConnectionFatory.oob
+媒体协商/SetRemoteDescription.oob
