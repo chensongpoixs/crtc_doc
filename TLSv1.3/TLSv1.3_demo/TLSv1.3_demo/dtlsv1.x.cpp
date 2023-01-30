@@ -918,11 +918,17 @@ namespace chen {
 			const char* role;
 
 			if ((w & SSL_ST_CONNECT) != 0)
+			{
 				role = "client";
+			}
 			else if ((w & SSL_ST_ACCEPT) != 0)
+			{
 				role = "server";
+			}
 			else
+			{
 				role = "undefined";
+			}
 
 			if ((where & SSL_CB_LOOP) != 0)
 			{
@@ -930,9 +936,9 @@ namespace chen {
 			}
 			else if ((where & SSL_CB_ALERT) != 0)
 			{
-				const char* alertType;
-
-				switch (*SSL_alert_type_string(ret))
+				//const char* alertType;
+				
+				/*switch (*SSL_alert_type_string(ret))
 				{
 				case 'W':
 					alertType = "warning";
@@ -944,20 +950,34 @@ namespace chen {
 
 				default:
 					alertType = "undefined";
-				}
-
+				}*/
+				// @see https://www.openssl.org/docs/man1.0.2/man3/SSL_alert_type_string_long.html
+				std::string alert_type = SSL_alert_type_string_long(ret);
+				std::string alert_desc = SSL_alert_desc_string(ret);
 				if ((where & SSL_CB_READ) != 0)
 				{
-					WARNING_EX_LOG( "[server_name = %s]received DTLS %s alert: %s", m_server_name.c_str(), alertType, SSL_alert_desc_string_long(ret));
+					WARNING_EX_LOG( "[server_name = %s]received DTLS %s alert: %s", m_server_name.c_str(), alert_type.c_str(), SSL_alert_desc_string_long(ret));
 				}
 				else if ((where & SSL_CB_WRITE) != 0)
 				{
-					DEBUG_EX_LOG(  "[server_name = %s]sending DTLS %s alert: %s", m_server_name.c_str(), alertType, SSL_alert_desc_string_long(ret));
+					DEBUG_EX_LOG(  "[server_name = %s]sending DTLS %s alert: %s", m_server_name.c_str(), alert_type.c_str(), SSL_alert_desc_string_long(ret));
 				}
 				else
 				{
-					DEBUG_EX_LOG(  "[server_name = %s]DTLS %s alert: %s", m_server_name.c_str(), alertType, SSL_alert_desc_string_long(ret));
+					DEBUG_EX_LOG(  "[server_name = %s]DTLS %s alert: %s", m_server_name.c_str(), alert_type.c_str(), SSL_alert_desc_string_long(ret));
 				}
+
+				/************************************************************************ 
+				// TODO@chensong 2022-01-30  DTLS 密钥协商失败就删除当前dtls的变量
+				// Notify the DTLS to handle the ALERT message, which maybe means media connection disconnect.
+				// CN(Close Notify) is sent when client close the PeerConnection.
+				if (alert_type == "warning" && alert_desc == "CN")
+				{ 
+					trace("RTC: session destroy by DTLS alert, username=%s", username_.c_str());
+					remove(this);
+				}
+				
+				************************************************************************/
 			}
 			else if ((where & SSL_CB_EXIT) != 0)
 			{
