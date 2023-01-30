@@ -304,7 +304,7 @@ namespace chen {
 		// NOTE: https://code.google.com/p/chromium/issues/detail?id=406458
 		// NOTE: https://bugs.ruby-lang.org/issues/12324
 
-		// For OpenSSL >= 1.0.2.
+		// For OpenSSL >= 1.0.2. //EC支持的曲线函数
 		SSL_CTX_set_ecdh_auto(sslCtx, 1);
 		// Setup DTLS context.
 		//if (true) {
@@ -321,6 +321,17 @@ namespace chen {
 
 		if (true)
 		{
+			// Set ciphers.
+			// We use "ALL", while you can use "DEFAULT" means "ALL:!EXPORT:!LOW:!aNULL:!eNULL:!SSLv2"
+			// @see https://www.openssl.org/docs/man1.0.2/man1/ciphers.html
+			ret = SSL_CTX_set_cipher_list(sslCtx, "DEFAULT:!NULL:!aNULL:!SHA256:!SHA384:!aECDH:!AESGCM+AES256:!aPSK");
+
+			if (ret == 0)
+			{
+				ERROR_EX_LOG("SSL_CTX_set_cipher_list() failed");
+
+				goto error;;
+			}
 			// Setup the certificate.
 			ret = SSL_CTX_use_certificate(sslCtx, certificate);
 
@@ -402,15 +413,7 @@ namespace chen {
 			// Set SSL info callback.
 			SSL_CTX_set_info_callback(sslCtx, onSslInfo);
 
-			// Set ciphers.
-			ret = SSL_CTX_set_cipher_list(sslCtx, "DEFAULT:!NULL:!aNULL:!SHA256:!SHA384:!aECDH:!AESGCM+AES256:!aPSK");
-
-			if (ret == 0)
-			{
-				ERROR_EX_LOG("SSL_CTX_set_cipher_list() failed");
-
-				goto error;;
-			}
+			
 
 
 
