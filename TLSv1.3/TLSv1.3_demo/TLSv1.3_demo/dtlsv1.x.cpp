@@ -1026,6 +1026,15 @@ namespace chen {
 		}
 
 		// Set this as custom data.
+		// openssl中提供保持数据的的api
+		//   1、使用SSL_set_ex_data(SSL *s, int idx, void *arg)  是根据小标使用保持数据的 
+		//       s  :  第一个参数openssl的变量
+		//       idx:  第二个参数是保持数据的位置索引 
+		//       arg:  第三个参数的保持数据的参数
+		//   2、使用  void *SSL_get_ex_data(const SSL *s, int idx) 函数是根据下标索引取openssl中保持数据
+		//       s     :    openssl的变量
+		//       idx   :    openssl中保持数据的下标索引
+		//      return ：   返回openssl中小标保持数据 
 		SSL_set_ex_data(this->ssl, 0, static_cast<void*>(this));
 
 		this->sslBioFromNetwork = BIO_new(BIO_s_mem());
