@@ -299,100 +299,150 @@ namespace chen {
 
 			goto error;;
 		}
-
-		ret = SSL_CTX_use_certificate(sslCtx, certificate);
-
-		if (ret == 0)
-		{
-			ERROR_EX_LOG("SSL_CTX_use_certificate() failed");
-
-			goto error;;
-		}
-
-		ret = SSL_CTX_use_PrivateKey(sslCtx, privateKey);
-
-		if (ret == 0)
-		{
-			ERROR_EX_LOG("SSL_CTX_use_PrivateKey() failed");
-
-			goto error;;
-		}
-
-		ret = SSL_CTX_check_private_key(sslCtx);
-
-		if (ret == 0)
-		{
-			ERROR_EX_LOG("SSL_CTX_check_private_key() failed");
-
-			goto error;;
-		}
-
-		// Set options.
-		SSL_CTX_set_options(
-			sslCtx,
-			SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_NO_TICKET | SSL_OP_SINGLE_ECDH_USE |
-			SSL_OP_NO_QUERY_MTU);
-
-		// Don't use sessions cache.
-		SSL_CTX_set_session_cache_mode(sslCtx, SSL_SESS_CACHE_OFF);
-
-		// Read always as much into the buffer as possible.
-		// NOTE: This is the default for DTLS, but a bug in non latest OpenSSL
-		// versions makes this call required.
-		SSL_CTX_set_read_ahead(sslCtx, 1);
-
-		SSL_CTX_set_verify_depth(sslCtx, 4);
-
-		// Require certificate from peer.
-		SSL_CTX_set_verify(
-			sslCtx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, onSslCertificateVerify);
-
-		// Set SSL info callback.
-		SSL_CTX_set_info_callback(sslCtx, onSslInfo);
-
-		// Set ciphers.
-		ret = SSL_CTX_set_cipher_list(
-			sslCtx, "DEFAULT:!NULL:!aNULL:!SHA256:!SHA384:!aECDH:!AESGCM+AES256:!aPSK");
-
-		if (ret == 0)
-		{
-			ERROR_EX_LOG("SSL_CTX_set_cipher_list() failed");
-
-			goto error;;
-		}
-
 		// Enable ECDH ciphers.
 		// DOC: http://en.wikibooks.org/wiki/OpenSSL/Diffie-Hellman_parameters
 		// NOTE: https://code.google.com/p/chromium/issues/detail?id=406458
 		// NOTE: https://bugs.ruby-lang.org/issues/12324
 
 		// For OpenSSL >= 1.0.2.
-		SSL_CTX_set_ecdh_auto( sslCtx, 1);
+		SSL_CTX_set_ecdh_auto(sslCtx, 1);
+		// Setup DTLS context.
+		//if (true) {
+		//// We use "ALL", while you can use "DEFAULT" means "ALL:!EXPORT:!LOW:!aNULL:!eNULL:!SSLv2"
+		//// @see https://www.openssl.org/docs/man1.0.2/man1/ciphers.html
+		//ret = SSL_CTX_set_cipher_list(sslCtx, "ALL")  ;
+		//if (ret == 0)
+		//{
+		//	ERROR_EX_LOG("SSL_CTX_set_cipher_list() failed");
 
-		// Set the "use_srtp" DTLS extension.
-		for (auto it = srtpCryptoSuites.begin(); it != srtpCryptoSuites.end(); ++it)
+		//	goto error;;
+		//}
+
+
+		if (true)
 		{
-			if (it != srtpCryptoSuites.begin())
+			// Setup the certificate.
+			ret = SSL_CTX_use_certificate(sslCtx, certificate);
+
+			if (ret == 0)
 			{
-				dtlsSrtpCryptoSuites += ":";
+				ERROR_EX_LOG("SSL_CTX_use_certificate() failed");
+				goto error;;
 			}
 
-			SrtpCryptoSuiteMapEntry* cryptoSuiteEntry = std::addressof(*it);
-			dtlsSrtpCryptoSuites += cryptoSuiteEntry->name;
-		}
+			ret = SSL_CTX_use_PrivateKey(sslCtx, privateKey);
 
-		DEBUG_EX_LOG("setting SRTP cryptoSuites for DTLS: %s", dtlsSrtpCryptoSuites.c_str());
+			if (ret == 0)
+			{
+				ERROR_EX_LOG("SSL_CTX_use_PrivateKey() failed");
 
-		// NOTE: This function returns 0 on success.
-		ret = SSL_CTX_set_tlsext_use_srtp(sslCtx, dtlsSrtpCryptoSuites.c_str());
+				goto error;;
+			}
 
-		if (ret != 0)
-		{
-			ERROR_EX_LOG(
-				"SSL_CTX_set_tlsext_use_srtp() failed when entering '%s'", dtlsSrtpCryptoSuites.c_str());
-			ERROR_EX_LOG("SSL_CTX_set_tlsext_use_srtp() failed");
+			ret = SSL_CTX_check_private_key(sslCtx);
 
-			goto error;
+			if (ret == 0)
+			{
+				ERROR_EX_LOG("SSL_CTX_check_private_key() failed");
+
+				goto error;;
+			}
+
+			// Set options.
+			// @see https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_set_options.html
+			//// set dtls fragment
+			// @see https://stackoverflow.com/questions/62413602/openssl-server-packets-get-fragmented-into-270-bytes-per-packet
+			SSL_CTX_set_options(sslCtx, SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_NO_TICKET | SSL_OP_SINGLE_ECDH_USE | SSL_OP_NO_QUERY_MTU);
+
+			// Don't use sessions cache.
+			// @see https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_set_session_cache_mode.html 
+			// SSL_SESS_CACHE_OFF : 不会对客户端或服务器进行会话缓存
+			SSL_CTX_set_session_cache_mode(sslCtx, SSL_SESS_CACHE_OFF);
+
+			 
+			// Require certificate from peer.
+			// Server will send Certificate Request.
+			// @see https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_set_verify.html
+			// TODO: FIXME: Config it, default to off to make the packet smaller.
+			// 其中 SSL_VERIFY_FAIL_IF_NO_PEER_CERT和SSL_VERIFY_CLIENT_ONCE 
+			/*
+			SSL_VERIFY_FAIL_IF_NO_PEER_CERT
+
+				服务器模式：如果客户端未返回证书，则 TLS/SSL 握手将立即终止，并显示“握手失败”警报。此标志必须与SSL_VERIFY_PEER一起使用。
+
+				客户端模式：忽略
+
+			SSL_VERIFY_CLIENT_ONCE
+
+				服务器模式：仅在初始 TLS/SSL 握手时请求客户端证书。在重新协商的情况下，不要再次要求提供客户端证书。此标志必须与SSL_VERIFY_PEER一起使用
+
+				客户端模式：忽略
+
+				总结： SSL_VERIFY_CLIENT_ONCE 在SSL_VERIFY_FAIL_IF_NO_PEER_CERT在进行了优化 作用已经有的证书就不需要再次验证了
+
+			*/
+			// 设置对等证书验证参数
+			SSL_CTX_set_verify(sslCtx, SSL_VERIFY_PEER | /*SSL_VERIFY_FAIL_IF_NO_PEER_CERT*/ SSL_VERIFY_CLIENT_ONCE, onSslCertificateVerify);
+
+
+			// The depth count is "level 0:peer certificate", "level 1: CA certificate",
+		   // "level 2: higher level CA certificate", and so on.
+		   // @see https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_set_verify.html
+			SSL_CTX_set_verify_depth(sslCtx, 4);
+
+
+
+			// Read always as much into the buffer as possible.
+			// NOTE: This is the default for DTLS, but a bug in non latest OpenSSL
+			// versions makes this call required.
+			// Whether we should read as many input bytes as possible (for non-blocking reads) or not.
+			// @see https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_set_read_ahead.html
+			SSL_CTX_set_read_ahead(sslCtx, 1);
+
+			// Set SSL info callback.
+			SSL_CTX_set_info_callback(sslCtx, onSslInfo);
+
+			// Set ciphers.
+			ret = SSL_CTX_set_cipher_list(sslCtx, "DEFAULT:!NULL:!aNULL:!SHA256:!SHA384:!aECDH:!AESGCM+AES256:!aPSK");
+
+			if (ret == 0)
+			{
+				ERROR_EX_LOG("SSL_CTX_set_cipher_list() failed");
+
+				goto error;;
+			}
+
+
+
+			// Set the "use_srtp" DTLS extension.
+			for (auto it = srtpCryptoSuites.begin(); it != srtpCryptoSuites.end(); ++it)
+			{
+				if (it != srtpCryptoSuites.begin())
+				{
+					dtlsSrtpCryptoSuites += ":";
+				}
+
+				SrtpCryptoSuiteMapEntry* cryptoSuiteEntry = std::addressof(*it);
+				dtlsSrtpCryptoSuites += cryptoSuiteEntry->name;
+			}
+
+			DEBUG_EX_LOG("setting SRTP cryptoSuites for DTLS: %s", dtlsSrtpCryptoSuites.c_str());
+
+			// NOTE: This function returns 0 on success.
+			// TODO: Maybe we can use SRTP-GCM in future.
+			// @see https://bugs.chromium.org/p/chromium/issues/detail?id=713701
+			// @see https://groups.google.com/forum/#!topic/discuss-webrtc/PvCbWSetVAQ
+			// @remark Only support SRTP_AES128_CM_SHA1_80, please read ssl/d1_srtp.c
+			ret = SSL_CTX_set_tlsext_use_srtp(sslCtx, dtlsSrtpCryptoSuites.c_str());
+
+			if (ret != 0)
+			{
+				ERROR_EX_LOG(
+					"SSL_CTX_set_tlsext_use_srtp() failed when entering '%s'", dtlsSrtpCryptoSuites.c_str());
+				ERROR_EX_LOG("SSL_CTX_set_tlsext_use_srtp() failed");
+
+				goto error;
+			}
 		}
 
 		return;
@@ -1057,6 +1107,27 @@ namespace chen {
 		//      return ：   返回openssl中小标保持数据 
 		SSL_set_ex_data(this->ssl, 0, static_cast<void*>(this));
 
+		// Set callback handler for setting DTLS timer interval.
+		//DTLS_set_timer_cb(this->ssl, onSslDtlsTimer);
+			// @see https://linux.die.net/man/3/openssl_version_number
+	//                MM NN FF PP S
+	// 0x1010102fL = 0x1 01 01 02 fL            // 1.1.1b release
+	//   MM(major) = 0x1                        // 1.*
+	//     NN(minor) = 0x01                     // 1.1.*
+	//          FF(fix) = 0x01                  // 1.1.1*
+	//     PP(patch) = 'a' + 0x02 - 1 = 'b'     // 1.1.1b *
+	//              S(status) = 0xf = release   // 1.1.1b release
+	// @note Status 0 for development, 1 to e for betas 1 to 14, and f for release.
+#if OPENSSL_VERSION_NUMBER >= 0x1010102fL // 1.1.1b
+		DTLS_set_timer_cb(this->ssl, onSslDtlsTimer);
+#endif
+
+
+		// Set the MTU so that we don't send packets that are too large with no fragmentation.
+		SSL_set_mtu(this->ssl, DtlsMtu);
+		DTLS_set_link_mtu(this->ssl, DtlsMtu);
+
+
 		this->sslBioFromNetwork = BIO_new(BIO_s_mem());
 
 		if (!this->sslBioFromNetwork)
@@ -1082,12 +1153,9 @@ namespace chen {
 
 		SSL_set_bio(this->ssl, this->sslBioFromNetwork, this->sslBioToNetwork);
 
-		// Set the MTU so that we don't send packets that are too large with no fragmentation.
-		SSL_set_mtu(this->ssl, DtlsMtu);
-		DTLS_set_link_mtu(this->ssl, DtlsMtu);
+		
 
-		// Set callback handler for setting DTLS timer interval.
-		//DTLS_set_timer_cb(this->ssl, onSslDtlsTimer);
+		
 
 		// Set the DTLS timer.
 		//this->timer = new Timer(this);
